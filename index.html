@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070b16">
+<title>Stream Detector</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#eef2ff;background:#070b16}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 15% 0%,#202b63 0,#070b16 42%,#04060d 100%)}
+.wrap{width:min(1100px,calc(100% - 20px));margin:auto;padding:24px 0 45px}.brand{display:flex;gap:13px;align-items:center;margin:4px 2px 20px}
+.logo{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(135deg,#4f46e5,#9333ea);font-weight:900;font-size:18px;box-shadow:0 12px 35px #4f46e555}
+h1{margin:0;font-size:clamp(25px,6vw,40px);letter-spacing:-1.3px}p{margin:4px 0;color:#aab5d0}
+.card{background:#0c1325dd;border:1px solid #ffffff13;border-radius:22px;padding:18px;box-shadow:0 20px 80px #0008;backdrop-filter:blur(18px)}
+.form{display:flex;gap:10px}.input{min-width:0;flex:1;padding:16px;border-radius:15px;border:1px solid #2a3552;background:#070c18;color:#fff;outline:none;font-size:15px}.input:focus{border-color:#7068ff}
+button{border:0;color:white;font-weight:800;cursor:pointer;border-radius:14px;padding:12px 16px;background:#5148f5}button:disabled{opacity:.55;cursor:not-allowed}.primary{min-width:145px}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.chip{background:#141d33;border:1px solid #ffffff12;color:#cbd5ee;padding:9px 12px}.chip.active{background:#342f89;border-color:#6f67ff}
+.status{display:flex;justify-content:space-between;gap:10px;margin-top:13px;color:#9aa7c4;font-size:13px}.dot{width:8px;height:8px;background:#22c55e;border-radius:50%;display:inline-block;margin-right:7px}.busy .dot{background:#f59e0b;animation:pulse 1s infinite}@keyframes pulse{50%{opacity:.25}}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:14px}.stat{background:#080e1d;border:1px solid #ffffff0d;border-radius:15px;padding:12px}.stat b{font-size:21px;display:block}.stat span{font-size:11px;color:#7f8ba6}
+.results{display:grid;gap:9px;margin-top:14px}.empty{text-align:center;color:#8592ae;padding:35px 12px}.item{background:#080e1d;border:1px solid #ffffff0c;border-radius:17px;padding:14px}.row{display:flex;justify-content:space-between;align-items:center;gap:8px}.badge{font-size:11px;font-weight:900;padding:5px 8px;border-radius:7px;background:#3730a3}.badge.dash{background:#075985}.url{font:12px/1.5 ui-monospace,SFMono-Regular,monospace;color:#dbe4ff;word-break:break-all;margin:9px 0}.meta{font-size:11px;color:#74819e}.actions{display:flex;gap:7px;margin-top:9px}.small{font-size:12px;padding:8px 10px;background:#18223b}
+.note{font-size:11px;line-height:1.5;color:#68758f;text-align:center;margin-top:17px}
+@media(max-width:650px){.wrap{padding-top:16px}.form{flex-direction:column}.primary{width:100%}.stats .stat{padding:10px 8px}.stat b{font-size:18px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><div class="logo">SD</div><div><h1>Stream Detector</h1><p>Fast HLS & DASH network detector</p></div></div>
+  <section class="card">
+    <div class="form">
+      <input id="url" class="input" placeholder="https://example.com/page" autocomplete="off" inputmode="url">
+      <button id="scan" class="primary">Start Scan</button>
+    </div>
+    <div class="tools">
+      <button class="chip active" data-filter="ALL">All</button>
+      <button class="chip" data-filter="HLS">HLS · M3U8</button>
+      <button class="chip" data-filter="DASH">DASH · MPD</button>
+      <button id="export" class="chip">Export JSON</button>
+      <button id="clear" class="chip">Clear</button>
+    </div>
+    <div id="status" class="status"><span><i class="dot"></i><span id="statusText">Ready</span></span><span id="time"></span></div>
+    <div class="stats">
+      <div class="stat"><b id="total">0</b><span>Total detected</span></div>
+      <div class="stat"><b id="hls">0</b><span>HLS / M3U8</span></div>
+      <div class="stat"><b id="dash">0</b><span>DASH / MPD</span></div>
+    </div>
+  </section>
+  <section id="results" class="results"><div class="card empty">Enter an authorized webpage to scan.</div></section>
+  <div class="note">Use only on websites and streams you own or are authorized to inspect. This detector does not bypass DRM, authentication, paywalls, or access controls.</div>
+</div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+import {getAnalytics,isSupported} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-analytics.js";
+
+const firebaseConfig={
+ apiKey:"AIzaSyBRmDbrOFkBndDh0yY-vI6T2nuU-8-1Hgs",
+ authDomain:"cyberanya-lnd.firebaseapp.com",
+ databaseURL:"https://cyberanya-lnd-default-rtdb.firebaseio.com",
+ projectId:"cyberanya-lnd",
+ storageBucket:"cyberanya-lnd.firebasestorage.app",
+ messagingSenderId:"4980278864",
+ appId:"1:4980278864:web:53f70234133236ffe53355",
+ measurementId:"G-M47Q7ZXDCW"
+};
+const app=initializeApp(firebaseConfig);
+isSupported().then(ok=>{if(ok)getAnalytics(app)}).catch(()=>{});
+
+const $=s=>document.querySelector(s); let data=[],filter="ALL",busy=false;
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+function render(){
+ const list=data.filter(x=>filter==="ALL"||x.type===filter);
+ $("#total").textContent=data.length;$("#hls").textContent=data.filter(x=>x.type==="HLS").length;$("#dash").textContent=data.filter(x=>x.type==="DASH").length;
+ if(!list.length){$("#results").innerHTML='<div class="card empty">'+(data.length?"No results for this filter.":"No HLS/DASH manifest detected.")+"</div>";return}
+ $("#results").innerHTML=list.map(x=>`<article class="item"><div class="row"><span class="badge ${x.type==="DASH"?"dash":""}">${esc(x.type)}</span><span class="meta">HTTP ${esc(x.status)}</span></div><div class="url">${esc(x.url)}</div><div class="meta">${esc(x.contentType||"unknown")} · ${esc(x.resourceType||"unknown")} · ${new Date(x.detectedAt).toLocaleTimeString()}</div><div class="actions"><button class="small" data-copy="${encodeURIComponent(x.url)}">Copy URL</button><button class="small" data-open="${encodeURIComponent(x.url)}">Open</button></div></article>`).join("");
+}
+document.addEventListener("click",async e=>{
+ const c=e.target.closest("[data-copy]"),o=e.target.closest("[data-open]");
+ if(c){const u=decodeURIComponent(c.dataset.copy);try{await navigator.clipboard.writeText(u);$("#statusText").textContent="URL copied"}catch{prompt("Copy URL",u)}}
+ if(o)window.open(decodeURIComponent(o.dataset.open),"_blank","noopener,noreferrer");
+});
+document.querySelectorAll("[data-filter]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-filter]").forEach(x=>x.classList.remove("active"));b.classList.add("active");filter=b.dataset.filter;render()});
+$("#clear").onclick=()=>{data=[];render();$("#statusText").textContent="Cleared"};
+$("#export").onclick=()=>{if(!data.length)return;const a=document.createElement("a"),b=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});a.href=URL.createObjectURL(b);a.download="stream-detections.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)};
+$("#scan").onclick=async()=>{
+ if(busy)return;let target=$("#url").value.trim();if(!target){$("#url").focus();return}
+ busy=true;$("#scan").disabled=true;$("#status").classList.add("busy");$("#statusText").textContent="Starting secure browser scan…";const t=performance.now();
+ try{
+  const r=await fetch("/api/scan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:target})});
+  const ct=r.headers.get("content-type")||"";
+  const text=await r.text();
+  let j;try{j=JSON.parse(text)}catch{throw new Error(`Backend returned ${r.status} ${ct||"non-JSON response"}`)}
+  if(!r.ok||!j.ok)throw new Error(j.error||"Scan failed");
+  data=j.results||[];render();$("#statusText").textContent=`Scan complete · ${data.length} manifest${data.length===1?"":"s"} found`;
+ }catch(e){$("#statusText").textContent=e.message||"Scan failed";$("#results").innerHTML='<div class="card empty">Backend unavailable or target could not be scanned.</div>'}
+ finally{busy=false;$("#scan").disabled=false;$("#status").classList.remove("busy");$("#time").textContent=((performance.now()-t)/1000).toFixed(1)+"s"}
+};
+$("#url").addEventListener("keydown",e=>{if(e.key==="Enter")$("#scan").click()});
+render();
+</script>
+</body>
+</html>
